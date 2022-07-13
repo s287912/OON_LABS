@@ -54,7 +54,6 @@ class Node(object):
         self._position = node_dict['position']
         self._connected_nodes = node_dict['connected_nodes']
         self._successive = {}
-        self._switching_matrix = None
     @property
     def label(self):
         return self._label
@@ -70,12 +69,6 @@ class Node(object):
     @successive.setter
     def successive(self, successive):
         self._successive = successive
-    @property
-    def switching_matrix(self):
-        return self._switching_matrix
-    @switching_matrix.setter
-    def switching_matrix(self, switching_matrix):
-        self._switching_matrix = switching_matrix
     def propagate(self, lightpath):
         path = lightpath.path
         if len(path) > 1:
@@ -90,7 +83,7 @@ class Line(object):
         self._label = line_dict['label']
         self._length = line_dict['length']
         self._successive = {}
-        self._state = [1] * param.channels
+        self._state = ['free'] * param.channels
     @property
     def label(self):
         return self._label
@@ -113,7 +106,7 @@ class Line(object):
         latency = self.length / (c * 2 / 3)
         return latency
     def noise_generation(self, signal_power):
-        noise = 1e-9 * signal_power * self.length
+        noise = 1e-3 * signal_power * self.length
         return noise
     def propagate(self, lightpath):
         latency = self.latency_generation()
@@ -124,7 +117,7 @@ class Line(object):
         node = self.successive[lightpath.path[0]]
         lightpath = node.propagate(lightpath)
         if type(lightpath) == Lightpath:
-            self.state[lightpath.channel] = 0
+            self.state[lightpath.channel] = 'occupied'
         return lightpath
     def probe(self, signal_information):
         latency = self.latency_generation()
@@ -179,12 +172,12 @@ class Network(object):
                     path_string += node + '->'
                 paths.append(path_string[:-2])
 
-                signal_information = SignalInformation(1e-3, path)
+                signal_information = SignalInformation(1, path)
                 signal_information = self.probe(signal_information)
                 latencies.append(signal_information.latency)
                 noises.append(signal_information.noise_power)
                 snrs.append(10 * np.log10(signal_information.signal_power / signal_information.noise_power))
-                path_state.append(1)
+                path_state.append('free')
         self._weighted_paths['path'] = paths
         self._weighted_paths['latency'] = latencies
         self._weighted_paths['noises'] = noises
@@ -238,15 +231,7 @@ class Network(object):
         lines_dict = self.lines
         for node_label in nodes_dict:
             node = nodes_dict[node_label]
-            node.switching_matrix = {}
             for connected_node in node.connected_nodes:
-                node.switching_matrix[connected_node] = {}
-                for second_connected_node in node.connected_nodes:
-                    if second_connected_node == connected_node:
-                        node.switching_matrix[connected_node][second_connected_node] = np.zeros(param.channels,np.int8)
-                    else:
-                        node.switching_matrix[connected_node][second_connected_node] = np.ones(param.channels,np.int8)
-
                 line_label = node_label + connected_node
                 line = lines_dict[line_label]
                 line.successive[connected_node] = nodes_dict[connected_node]
@@ -321,26 +306,17 @@ class Network(object):
         for ch in range(0, param.channels):
             df = self.route_space
             df = df.loc[(self.weighted_paths['path'] == path.replace('','->')[2:-2])]
-            if df['Ch.'+str(ch)].values == 1:
+            if df['Ch.'+str(ch)].values == 'free':
                 channel = ch
                 break
         return channel
     def update_route_space(self, best_path, channel):
-        df = self.weighted_paths['path'].str.replace('->','')
-        #print(df)
-        for path in df:
-            #print(path)
-            line = self.lines[path[0]+path[1]]
-            occupancy = line.state
-            node1 = 1
-            for node2 in range(2, len(path)):
-                line = self.lines[path[node1]+path[node2]]
-                occupancy = np.multiply(occupancy, line.state)
-                occupancy = np.multiply(self.nodes[path[node1]].switching_matrix[path[node1-1]][path[node2]], occupancy)
-                node1 = node2
-            #print(occupancy)
-            idx = self.weighted_paths.loc[df == path].index.values[0]
-            self.route_space.iloc[idx] = occupancy
+        df = self.route_space
+        for i in range(0,len(best_path)-1):
+            df_idx = self.weighted_paths['path'].loc[self.weighted_paths['path'].str.replace('->','').str.contains(best_path[i:i+2])].index
+            df['Ch.'+str(channel)].iloc[df_idx] = 'occupied'
+            #print(df['Ch.'+str(channel)].iloc[df_idx])
+        #print("occupying Ch.",channel,"of path:",best_path)
         return None
 
 class Connection(object):

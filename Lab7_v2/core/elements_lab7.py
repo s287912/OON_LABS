@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.constants import c
 from core import parameters as param
+from core import science_utils as science
 
 class SignalInformation(object):
     def __init__(self, power, path):
@@ -56,6 +57,7 @@ class Node(object):
         self._connected_nodes = node_dict['connected_nodes']
         self._successive = {}
         self._switching_matrix = None
+        self._transceiver = ''
     @property
     def label(self):
         return self._label
@@ -77,10 +79,24 @@ class Node(object):
     @switching_matrix.setter
     def switching_matrix(self, switching_matrix):
         self._switching_matrix = switching_matrix
-    def propagate(self, lightpath):
+    @property
+    def transceiver(self):
+        return self._transceiver
+    @transceiver.setter
+    def transceiver(self,transceiver):
+        self._transceiver = transceiver
+    def propagate(self, lightpath, prev_node):
         path = lightpath.path
         if len(path) > 1:
             line_label = path[:2]
+            if type(lightpath) is Lightpath:
+                if prev_node is not None:
+                    channels = self.switching_matrix[prev_node][line_label[1]]
+                    channels[lightpath.channel] = 0
+                    if lightpath.channel != param.channels:
+                        channels[lightpath.channel + 1] = 0
+                    if lightpath.channel != 0:
+                        channels[lightpath.channel - 1] = 0
             line = self.successive[line_label]
             lightpath.next()
             lightpath = line.propagate(lightpath)
@@ -114,7 +130,7 @@ class Line(object):
         latency = self.length / (c * 2 / 3)
         return latency
     def noise_generation(self, signal_power):
-        noise = 1e-3 * signal_power * self.length
+        noise = 1e-9 * signal_power * self.length
         return noise
     def propagate(self, lightpath):
         latency = self.latency_generation()
@@ -123,9 +139,11 @@ class Line(object):
         noise = self.noise_generation(signal_power)
         lightpath.add_noise(noise)
         node = self.successive[lightpath.path[0]]
-        lightpath = node.propagate(lightpath)
+
         if type(lightpath) == Lightpath:
-            self.state[lightpath.channel] = 0
+            lightpath = node.propagate(lightpath,self.label[0])
+        else:
+            lightpath = node.propagate(lightpath,None)
         return lightpath
     def probe(self, signal_information):
         latency = self.latency_generation()
@@ -150,6 +168,10 @@ class Network(object):
             node_dict = node_json[node_label]
             node_dict['label'] = node_label
             node = Node(node_dict)
+            if 'transceiver' in node_json[node_label].keys():
+                node.transceiver = node_json[node_label]['transceiver']
+            else:
+                node.transceiver = 'fixed_rate'
             self._nodes[node_label] = node
             #create line instances
             for connected_node_label in node_dict['connected_nodes']:
@@ -158,7 +180,7 @@ class Network(object):
                 line_dict['label'] = line_label
                 node_position = np.array(node_json[node_label]['position'])
                 connected_node_position = np.array(node_json[connected_node_label]['position'])
-                line_dict['length'] = np.sqrt(np.sum((node_position-connected_node_position))**2)
+                line_dict['length'] = np.sqrt(np.sum((node_position-connected_node_position)**2))
                 line = Line(line_dict)
                 self._lines[line_label] = line
             self._switching_matrix[node_label] = node_dict['switching_matrix']
@@ -258,12 +280,12 @@ class Network(object):
     def propagate(self, lightpath):
         path = lightpath.path
         start_node = self.nodes[path[0]]
-        propagated_signal_information = start_node.propagate(lightpath)
+        propagated_signal_information = start_node.propagate(lightpath, None)
         return propagated_signal_information
     def probe(self, signal_information):
         path = signal_information.path
         start_node = self.nodes[path[0]]
-        propagated_signal_information = start_node.propagate(signal_information)
+        propagated_signal_information = start_node.propagate(signal_information,None)
         return propagated_signal_information
     def find_best_snr(self, input_label, output_label):
         paths_df = self.weighted_paths
@@ -301,25 +323,33 @@ class Network(object):
             else:
                 best_path, channel = self.find_best_latency(connection.input, connection.output)
             if (best_path != '') & (channel != None):
-                lightpath = Lightpath(connection.signal_power, best_path, channel)
-                self.propagate(lightpath)
-                self.update_route_space(best_path, channel)
-                #print("connect:",connection.input,"->",connection.output, "of path:",best_path,"using channel:", channel)
+                bit_rate = self.calculate_bit_rate(best_path, self.nodes[best_path[0]].transceiver)
+                if bit_rate == 0:
+                    connection.snr = 0
+                    connection.latency = 0
+                    connection.bit_rate = 0
+                else:
+                    lightpath = Lightpath(connection.signal_power, best_path, channel)
+                    self.propagate(lightpath)
+                    self.update_route_space(best_path, channel)
+                    connection.bit_rate = bit_rate
+                    #print("connect:",connection.input,"->",connection.output, "of path:",best_path,"using channel:", channel)
                 if label == 'snr':
                     connection.snr = 10 * np.log10(lightpath.signal_power / lightpath.noise_power)
                 else:
                     connection.latency = lightpath.latency
             else:
-                df = self.route_space
-                df = df.loc[(self.weighted_paths['path'] == best_path.replace('', '->')[2:-2])]
+                #df = self.route_space
+                #df = df.loc[(self.weighted_paths['path'] == best_path.replace('', '->')[2:-2])]
                 #print("Not possible to connect:",connection.input,"->",connection.output)
                 #print("Occupation of", best_path)
                 #print(df)
                 connection.snr = 0.0
                 connection.latency = 0.0
-
-
-
+                connection.bit_rate = 0
+        self.restore_network()
+        #print(self.switching_matrix)
+        #exit()
     def find_channel(self, path):
         channel = None
         for ch in range(0, param.channels):
@@ -346,6 +376,35 @@ class Network(object):
             idx = self.weighted_paths.loc[df == path].index.values[0]
             self.route_space.iloc[idx] = occupancy
         return None
+    def restore_network(self):
+        path_state = [1]*self.weighted_paths.shape[0]
+        #print(path_state)
+        for nch in range(0, param.channels):
+            self._route_space['Ch.'+str(nch)] = path_state
+        nodes_dict = self.nodes
+        lines_dict = self.lines
+        for node_label in nodes_dict:
+            nodes_dict[node_label].switching_matrix = copy.deepcopy(self.switching_matrix[node_label])
+        for line_label in lines_dict:
+            lines_dict[line_label].state = np.ones(param.channels, np.int8)
+
+        self.update_route_space(None,None)
+
+    def calculate_bit_rate(self, path, strategy):
+        bit_rate = 0
+        gsnr = self.weighted_paths[self.weighted_paths['path'] == path.replace('', '->')[2:-2]]['snr']
+        #print(gsnr)
+        gsnr = float(10 ** (gsnr / 10))
+
+        if strategy == 'fixed_rate':
+            bit_rate = science.bit_rate_fixed(gsnr)
+        elif strategy == 'flex_rate':
+            bit_rate = science.bit_rate_flex(gsnr)
+        elif strategy == 'shannon':
+            bit_rate = science.bit_rate_shannon(gsnr)
+
+        print(gsnr, bit_rate)
+        return bit_rate
 
 class Connection(object):
     def __init__(self, input, output, signal_power):
@@ -354,6 +413,7 @@ class Connection(object):
         self._signal_power = float(signal_power)
         self._latency = 0.0
         self._snr = 0.0
+        self._bit_rate = 0.0
     @property
     def input(self):
         return self._input
@@ -366,12 +426,20 @@ class Connection(object):
     @property
     def latency(self):
         return self._latency
-    @property
-    def snr(self):
-        return self._snr
     @latency.setter
     def latency(self, latency):
         self._latency = latency
+    @property
+    def snr(self):
+        return self._snr
     @snr.setter
     def snr(self, snr):
         self._snr = snr
+
+    @property
+    def bit_rate(self):
+        return self._bit_rate
+
+    @bit_rate.setter
+    def bit_rate(self, bit_rate):
+        self._bit_rate = bit_rate

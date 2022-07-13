@@ -1,0 +1,20 @@
+{
+ "A": {
+  "connected_nodes": [
+   "B"
+  ],
+  "position": [
+   -350e3,
+   150e3
+  ]
+ },
+ "B": {
+  "connected_nodes": [
+   "A"
+  ],
+  "position": [
+   -100e3,
+   400e3
+  ]
+ }
+}

@@ -113,7 +113,7 @@ class Line(object):
         latency = self.length / (c * 2 / 3)
         return latency
     def noise_generation(self, signal_power):
-        noise = 1e-3 * signal_power * self.length
+        noise = 1e-9 * signal_power * self.length
         return noise
     def propagate(self, lightpath):
         latency = self.latency_generation()
@@ -156,7 +156,7 @@ class Network(object):
                 line_dict['label'] = line_label
                 node_position = np.array(node_json[node_label]['position'])
                 connected_node_position = np.array(node_json[connected_node_label]['position'])
-                line_dict['length'] = np.sqrt(np.sum((node_position-connected_node_position))**2)
+                line_dict['length'] = np.sqrt(np.sum((node_position-connected_node_position)**2))
                 line = Line(line_dict)
                 self._lines[line_label] = line
         #create the weight
@@ -306,8 +306,8 @@ class Network(object):
                 else:
                     connection.latency = lightpath.latency
             else:
-                df = self.route_space
-                df = df.loc[(self.weighted_paths['path'] == best_path.replace('', '->')[2:-2])]
+                #df = self.route_space
+                #df = df.loc[(self.weighted_paths['path'] == best_path.replace('', '->')[2:-2])]
                 #print("Not possible to connect:",connection.input,"->",connection.output)
                 #print("Occupation of", best_path)
                 #print(df)
@@ -341,6 +341,7 @@ class Network(object):
             #print(occupancy)
             idx = self.weighted_paths.loc[df == path].index.values[0]
             self.route_space.iloc[idx] = occupancy
+            #print(self.route_space.iloc[idx])
         return None
 
 class Connection(object):

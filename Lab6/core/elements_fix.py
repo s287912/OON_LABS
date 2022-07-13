@@ -1,4 +1,3 @@
-import copy
 import json
 import numpy as np
 import matplotlib.pyplot as plt
@@ -77,18 +76,10 @@ class Node(object):
     @switching_matrix.setter
     def switching_matrix(self, switching_matrix):
         self._switching_matrix = switching_matrix
-    def propagate(self, lightpath, prev_node):
+    def propagate(self, lightpath):
         path = lightpath.path
         if len(path) > 1:
             line_label = path[:2]
-            if type(lightpath) is Lightpath:
-                if prev_node is not None:
-                    channels = self.switching_matrix[prev_node][line_label[1]]
-                    channels[lightpath.channel] = 0
-                    if lightpath.channel != param.channels:
-                        channels[lightpath.channel + 1] = 0
-                    if lightpath.channel != 0:
-                        channels[lightpath.channel - 1] = 0
             line = self.successive[line_label]
             lightpath.next()
             lightpath = line.propagate(lightpath)
@@ -122,7 +113,7 @@ class Line(object):
         latency = self.length / (c * 2 / 3)
         return latency
     def noise_generation(self, signal_power):
-        noise = 1e-3 * signal_power * self.length
+        noise = 1e-9 * signal_power * self.length
         return noise
     def propagate(self, lightpath):
         latency = self.latency_generation()
@@ -131,11 +122,9 @@ class Line(object):
         noise = self.noise_generation(signal_power)
         lightpath.add_noise(noise)
         node = self.successive[lightpath.path[0]]
-
+        lightpath = node.propagate(lightpath)
         if type(lightpath) == Lightpath:
-            lightpath = node.propagate(lightpath,self.label[0])
-        else:
-            lightpath = node.propagate(lightpath,None)
+            self.state[lightpath.channel] = 0
         return lightpath
     def probe(self, signal_information):
         latency = self.latency_generation()
@@ -144,7 +133,7 @@ class Line(object):
         noise = self.noise_generation(signal_power)
         signal_information.add_noise(noise)
         node = self.successive[signal_information.path[0]]
-        signal_information = node.propagate(signal_information,None)
+        lightpath = node.propagate(signal_information)
         return signal_information
 
 class Network(object):
@@ -154,7 +143,6 @@ class Network(object):
         self._lines = {}
         self._weighted_paths = pd.DataFrame()
         self._route_space = pd.DataFrame()
-        self._switching_matrix = {}
         for node_label in node_json:
             # create node instance
             node_dict = node_json[node_label]
@@ -168,13 +156,9 @@ class Network(object):
                 line_dict['label'] = line_label
                 node_position = np.array(node_json[node_label]['position'])
                 connected_node_position = np.array(node_json[connected_node_label]['position'])
-                line_dict['length'] = np.sqrt(np.sum((node_position-connected_node_position))**2)
+                line_dict['length'] = np.sqrt(np.sum((node_position-connected_node_position)**2))
                 line = Line(line_dict)
                 self._lines[line_label] = line
-
-            self._switching_matrix[node_label] = node_dict['switching_matrix']
-            #print("switching_matrix", self._switching_matrix_dict)
-            #exit()
         #create the weight
         self.connect()
         node_labels = self.nodes.keys()
@@ -195,12 +179,12 @@ class Network(object):
                     path_string += node + '->'
                 paths.append(path_string[:-2])
 
-                signal_information = SignalInformation(1, path)
+                signal_information = SignalInformation(1e-3, path)
                 signal_information = self.probe(signal_information)
                 latencies.append(signal_information.latency)
                 noises.append(signal_information.noise_power)
                 snrs.append(10 * np.log10(signal_information.signal_power / signal_information.noise_power))
-                path_state.append(1)
+                #path_state.append(1)
         self._weighted_paths['path'] = paths
         self._weighted_paths['latency'] = latencies
         self._weighted_paths['noises'] = noises
@@ -219,12 +203,6 @@ class Network(object):
     @property
     def route_space(self):
         return self._route_space
-    @property
-    def switching_matrix(self):
-        return self._switching_matrix
-    @switching_matrix.setter
-    def switching_matrix(self, switching_matrix):
-        self._switching_matrix = switching_matrix
     @property
     def draw(self):
         nodes = self.nodes
@@ -260,8 +238,15 @@ class Network(object):
         lines_dict = self.lines
         for node_label in nodes_dict:
             node = nodes_dict[node_label]
-            node.switching_matrix = copy.deepcopy(self.switching_matrix[node_label])
+            node.switching_matrix = {}
             for connected_node in node.connected_nodes:
+                node.switching_matrix[connected_node] = {}
+                for second_connected_node in node.connected_nodes:
+                    if second_connected_node == connected_node:
+                        node.switching_matrix[connected_node][second_connected_node] = np.zeros(param.channels,np.int8)
+                    else:
+                        node.switching_matrix[connected_node][second_connected_node] = np.ones(param.channels,np.int8)
+
                 line_label = node_label + connected_node
                 line = lines_dict[line_label]
                 line.successive[connected_node] = nodes_dict[connected_node]
@@ -269,12 +254,12 @@ class Network(object):
     def propagate(self, lightpath):
         path = lightpath.path
         start_node = self.nodes[path[0]]
-        propagated_signal_information = start_node.propagate(lightpath, None)
+        propagated_signal_information = start_node.propagate(lightpath)
         return propagated_signal_information
     def probe(self, signal_information):
         path = signal_information.path
         start_node = self.nodes[path[0]]
-        propagated_signal_information = start_node.propagate(signal_information,None)
+        propagated_signal_information = start_node.propagate(signal_information)
         return propagated_signal_information
     def find_best_snr(self, input_label, output_label):
         paths_df = self.weighted_paths
@@ -321,15 +306,14 @@ class Network(object):
                 else:
                     connection.latency = lightpath.latency
             else:
-                #df = self.route_space
-                #df = df.loc[(self.weighted_paths['path'] == best_path.replace('', '->')[2:-2])]
+                df = self.route_space
+                df = df.loc[(self.weighted_paths['path'] == best_path.replace('', '->')[2:-2])]
                 #print("Not possible to connect:",connection.input,"->",connection.output)
                 #print("Occupation of", best_path)
                 #print(df)
                 connection.snr = 0.0
                 connection.latency = 0.0
 
-        self.restore_network()
 
 
     def find_channel(self, path):
@@ -354,20 +338,10 @@ class Network(object):
                 occupancy = np.multiply(occupancy, line.state)
                 occupancy = np.multiply(self.nodes[path[node1]].switching_matrix[path[node1-1]][path[node2]], occupancy)
                 node1 = node2
-
             #print(occupancy)
             idx = self.weighted_paths.loc[df == path].index.values[0]
             self.route_space.iloc[idx] = occupancy
         return None
-    def restore_network(self):
-        nodes_dict = self.nodes
-        lines_dict = self.lines
-        for node_label in nodes_dict:
-            nodes_dict[node_label].switching_matrix = copy.deepcopy(self.switching_matrix[node_label])
-        for line_label in lines_dict:
-            lines_dict[line_label].state = np.ones(param.channels, np.int8)
-
-        self.update_route_space(None,None)
 
 class Connection(object):
     def __init__(self, input, output, signal_power):

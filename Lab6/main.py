@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import random as rand
 
 from core import elements as elem
-from core import elements_old as elem2
+from core import elements_git as elem2
 
 if __name__ == '__main__':
     net = elem.Network('resources/nodes.json')
@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
 connections = []
 connections2 = []
-for i in range(0, 100):
+for i in range(0, 10):
     nodes = list(net.nodes.keys())
     node1 = rand.choice(nodes)
     nodes.remove(node1)
@@ -27,10 +27,11 @@ for i in range(0, 100):
     connections2.append(conn2)
 
 #net.route_space.iloc[0] = ['occupied']*10
+print(net.weighted_paths)
+print(net2.weighted_paths)
 
-print("Prova")
 net.stream(connections,'latency')
-net2.stream(connections2,'latency')
+net2.stream(connections2)
 print(net.weighted_paths)
 #for conn in connections:
 #    print(conn.input,'->',conn.output,'best snr:', conn.snr, 'best latency:', conn.latency)
@@ -64,6 +65,6 @@ plt.ylabel("Paths")
 plt.title("Latencies")
 print(net.route_space)
 print(net2.route_space)
-#plt.show()
+plt.show()
 #net.draw
 
