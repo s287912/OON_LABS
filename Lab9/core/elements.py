@@ -171,7 +171,8 @@ class Line(object):
         latency = self.length / (c * 2 / 3)
         return latency
     def noise_generation(self, signal_power):
-        noise = 1e-9 * signal_power * self.length
+        #noise = 1e-9 * signal_power * self.length #old one
+        noise = self.nli_generation(signal_power) + self.ase_generation()
         return noise
     def propagate(self, lightpath):
         latency = self.latency_generation()
@@ -199,13 +200,19 @@ class Line(object):
         self.n_amplifier = (math.ceil(self.length / 80e3) - 1) + 2
         ASE = self.n_amplifier * (param.h * param.f * param.Bn * self.noise_figure * (self.gain - 1))
         return ASE
-    def nli_generation(self, signal):
+    def eta_nli(self):
         Leff = 1 / (2 * self.alfa)
-        eta_nli = (16 / (27*math.pi)) * np.log((math.pi ** 2) / 2 * np.abs(self.beta2) * (param.Rs ** 2) / self.alfa  \
-                    * (param.channels ** (2 * (param.Rs) / (param.df) ) ) ) * (self.alfa / np.abs(self.beta2)) \
+        eta_nli = (16 / (27 * math.pi)) * np.log((math.pi ** 2) / 2 * np.abs(self.beta2) * (param.Rs ** 2) / self.alfa \
+                    * (param.channels ** (2 * (param.Rs) / (param.df)))) * (self.alfa / np.abs(self.beta2)) \
                     * ((self.gamma ** 2) * (Leff ** 2) / (param.Rs ** 3))
-        NLI = (signal.signal_power ** 3) * eta_nli * self.n_span * param.Bn
+        return eta_nli
+    def nli_generation(self, signal_power):
+        eta_nli = self.eta_nli()
+        NLI = (signal_power ** 3) * eta_nli * self.n_span * param.Bn
         return NLI
+    def optimized_launch_power(self):
+        Popt = np.cbrt((self.ase_generation()) / (2 * param.Bn * self.n_span * self.eta_nli()))
+        return Popt
 
 class Network(object):
     def __init__(self, json_path):
@@ -258,7 +265,7 @@ class Network(object):
                     path_string += node + '->'
                 paths.append(path_string[:-2])
 
-                signal_information = SignalInformation(1, path)
+                signal_information = SignalInformation(1e-3, path)
                 signal_information = self.probe(signal_information)
                 latencies.append(signal_information.latency)
                 noises.append(signal_information.noise_power)
