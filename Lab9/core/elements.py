@@ -7,6 +7,7 @@ import pandas as pd
 from scipy.constants import c
 from core import parameters as param
 from core import science_utils as science
+import random as rand
 
 class SignalInformation(object):
     def __init__(self, power, path):
@@ -17,6 +18,9 @@ class SignalInformation(object):
     @property
     def signal_power(self):
         return self._signal_power
+    @signal_power.setter
+    def signal_power(self, power):
+        self._signal_power = power
     @property
     def path(self):
         return self._path
@@ -107,6 +111,7 @@ class Node(object):
                     if lightpath.channel != 0:
                         channels[lightpath.channel - 1] = 0
             line = self.successive[line_label]
+            lightpath.signal_power = line.optimized_launch_power()
             lightpath.next()
             lightpath = line.propagate(lightpath)
         return lightpath
@@ -202,16 +207,16 @@ class Line(object):
         return ASE
     def eta_nli(self):
         Leff = 1 / (2 * self.alfa)
-        eta_nli = (16 / (27 * math.pi)) * np.log((math.pi ** 2) / 2 * np.abs(self.beta2) * (param.Rs ** 2) / self.alfa \
-                    * (param.channels ** (2 * (param.Rs) / (param.df)))) * (self.alfa / np.abs(self.beta2)) \
-                    * ((self.gamma ** 2) * (Leff ** 2) / (param.Rs ** 3))
+        eta_nli = 16 / (27 * np.pi) * np.log((np.pi ** 2) / 2 * self.beta2 * (param.Rs ** 2) / self.alfa \
+                * (param.channels ** (2 * param.Rs / param.df))) \
+               * (self.alfa / self.beta2 * ((self.gamma ** 2) * (Leff ** 2) / (param.Rs ** 3)))
         return eta_nli
     def nli_generation(self, signal_power):
         eta_nli = self.eta_nli()
         NLI = (signal_power ** 3) * eta_nli * self.n_span * param.Bn
         return NLI
     def optimized_launch_power(self):
-        Popt = np.cbrt((self.ase_generation()) / (2 * param.Bn * self.n_span * self.eta_nli()))
+        Popt = (self.ase_generation() / (2 * param.Bn * self.n_span * self.eta_nli())) ** (1/3)
         return Popt
 
 class Network(object):
@@ -383,7 +388,7 @@ class Network(object):
                 best_path, channel = self.find_best_latency(connection.input, connection.output)
             if (best_path != '') & (channel != None):
                 lightpath = Lightpath(connection.signal_power, best_path, channel)
-                bit_rate = self.calculate_bit_rate(best_path, self.nodes[best_path[0]].transceiver)
+                bit_rate = self.calculate_bit_rate(lightpath, self.nodes[best_path[0]].transceiver)
                 if bit_rate == 0:
                     connection.snr = 0
                     connection.latency = 0
@@ -449,21 +454,47 @@ class Network(object):
 
         self.update_route_space(None,None)
 
-    def calculate_bit_rate(self, path, strategy):
+    def calculate_bit_rate(self, lightpath, strategy):
+        path = lightpath.path
         bit_rate = 0
-        gsnr = self.weighted_paths[self.weighted_paths['path'] == path.replace('', '->')[2:-2]]['snr']
+        gsnr = self.weighted_paths[self.weighted_paths['path'] == path.replace('', '->')[2:-2]]['snr'].values[0]
         #print(gsnr)
         gsnr = float(10 ** (gsnr / 10))
 
         if strategy == 'fixed_rate':
-            bit_rate = science.bit_rate_fixed(gsnr)
+            bit_rate = science.bit_rate_fixed(gsnr, lightpath.Rs)
         elif strategy == 'flex_rate':
-            bit_rate = science.bit_rate_flex(gsnr)
+            bit_rate = science.bit_rate_flex(gsnr, lightpath.Rs)
         elif strategy == 'shannon':
-            bit_rate = science.bit_rate_shannon(gsnr)
+            bit_rate = science.bit_rate_shannon(gsnr, lightpath.Rs)
 
         print(gsnr, bit_rate)
         return bit_rate
+    def traffic_matrix_request(self, traffic_matrix, connections, signal_power):
+        nodes_full = list(self.nodes.keys())
+        for i in range(0,1000):
+            nodes = copy.deepcopy(nodes_full)
+            input_node = rand.choice(nodes)
+            nodes.remove(input_node)
+            output_node = rand.choice(nodes)
+            print("input:",input_node,"output:",output_node)
+            if traffic_matrix[input_node][output_node] != 0 and traffic_matrix[input_node][output_node] != math.inf:
+                break
+        connection = Connection(input_node, output_node, signal_power)
+        current_connections = [connection]
+        self.stream(current_connections, 'snr')
+        connections.append(connection)
+        print("traffic:", traffic_matrix[input_node][output_node])
+        if connection.snr != 0:
+            if connection.bit_rate >= traffic_matrix[input_node][output_node]:
+                traffic_matrix[input_node][output_node] = 0
+                return 1
+            else:
+                traffic_matrix[input_node][output_node] -= connection.bit_rate
+                return 0
+        else:
+            traffic_matrix[input_node][output_node] = math.inf
+        return 1
 
 class Connection(object):
     def __init__(self, input, output, signal_power):

@@ -10,9 +10,22 @@ from core import elements as elem
 #from core import elements_git as elem2
 
 if __name__ == '__main__':
-    net = elem.Network('resources/nodes_full.json')
-#    net2 = elem.Network('resources/nodes_full_flex_rate.json')
-  #  net3 = elem.Network('resources/nodes_full_shannon.json')
+    net = elem.Network('resources/nodes_full_fixed_rate.json')
+    net2 = elem.Network('resources/nodes_full_flex_rate.json')
+    net3 = elem.Network('resources/nodes_full_shannon.json')
+
+M= 1
+traffic_matrix = util.init_traffic_matrix(net, M)
+n_nodes = len(net.nodes)
+connections = []
+conn_made = n_nodes * n_nodes - n_nodes
+while conn_made > 0:
+    conn_made -= net.traffic_matrix_request(traffic_matrix, connections, 1e-3)
+    #print(traffic_matrix)
+
+util.plot_snr_and_bit_rate('fixed_rate', connections)
+
+exit()
 
 #for i in range(0, len(net.weighted_paths)):
 #    print(net.weighted_paths.sort_values(by='snr', ascending=False).iloc[i],net.weighted_paths.sort_values(by='latency', ascending=True).iloc[i])
@@ -34,15 +47,15 @@ if __name__ == '__main__':
 #     connections3.append(conn3)
 
 connections = []
-with open('resources/connectionsFile10.csv') as csv100ConnectionsFile:
+with open('resources/connectionsFile.csv') as csv100ConnectionsFile:
     csvReader = csv.reader(csv100ConnectionsFile)
     for row in csvReader:
         connections.append(elem.Connection(row[0], row[1], float(row[2])))
 
 # Saving 100 connections in a variable in order to create
 # a network with not full switching matrices considering the same connections
-#connections2 = copy.deepcopy(connections[:])
-#connections3 = copy.deepcopy(connections[:])
+connections2 = copy.deepcopy(connections[:])
+connections3 = copy.deepcopy(connections[:])
 
 #net.route_space.iloc[0] = ['occupied']*10
 
@@ -51,6 +64,12 @@ net.stream(connections,'snr')
 #net2.stream(connections2,'snr')
 #net3.stream(connections3,'snr')
 print(net.weighted_paths)
+
+stream_snr = []
+for conn in connections:
+    stream_snr.append(conn.snr)
+util.plot_snr_and_bit_rate('Fixed', connections)
+exit()
 #print(net2.weighted_paths)
 #for conn in connections:
 #    print(conn.input,'->',conn.output,'best snr:', conn.snr, 'best latency:', conn.latency)
@@ -60,26 +79,26 @@ print(net.weighted_paths)
 
 #print(net.draw)
 #print(net.weighted_paths)
-stream_snr = []
-#stream_snr2 = []
-#stream_snr3 = []
-for conn in connections:
-    stream_snr.append(conn.snr)
-#for conn in connections2:
-#    stream_snr2.append(conn.snr)
-#for conn in connections3:
-#    stream_snr3.append(conn.snr)
+
+stream_snr2 = []
+stream_snr3 = []
+
+for conn in connections2:
+    stream_snr2.append(conn.snr)
+for conn in connections3:
+    stream_snr3.append(conn.snr)
 
 
-util.plot_snr_and_bit_rate('Fixed', connections)
-#util.plot_snr_and_bit_rate('Flex', connections2)
-#util.plot_snr_and_bit_rate('Shannon', connections3)
+
+util.plot_snr_and_bit_rate('Flex', connections2)
+util.plot_snr_and_bit_rate('Shannon', connections3)
+exit()
 print(net.lines['AB'].ase_generation())
 
 print(net.lines['AB'].n_amplifier)
 print(net.lines['AB'].n_span)
 print(net.weighted_paths)
-exit()
+
 #for conn in connections2:
 #        stream_latency2.append(conn.snr)
 print("N. conn for latency", len(stream_snr))

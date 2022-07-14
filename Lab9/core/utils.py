@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import math
 import statistics as st
 from matplotlib.offsetbox import AnchoredText
+from core import parameters as param
 def truncate(number, decimals=0):
     """
     Returns a value truncated to a specific number of decimal places.
@@ -67,3 +68,16 @@ def plot_snr_and_bit_rate(strategy, connections):
     anchored_text = AnchoredText('Average bit rate = ' + str(avg_bit_rate)+'Gbps'+ '\nTotal capacity allocated = ' + str(tot_capacity)+'Gbps', loc='upper left', pad=0.5,prop=dict(size=9))
     ax.add_artist(anchored_text)
     plt.show()
+
+
+def init_traffic_matrix(network, M):
+    n_nodes = len(network.nodes)
+    traffic_matrix = {}
+    for node1 in network.nodes.keys():
+        traffic_matrix[node1] = {}
+        for node2 in network.nodes.keys():
+            if node1 != node2:
+                traffic_matrix[node1][node2] = param.Rb_min * M
+            else:
+                traffic_matrix[node1][node2] = math.inf
+    return traffic_matrix
