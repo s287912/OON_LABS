@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import math
 import statistics as st
+import copy
+import pandas as pd
 from matplotlib.offsetbox import AnchoredText
 from core import parameters as param
 def truncate(number, decimals=0):
@@ -81,3 +83,23 @@ def init_traffic_matrix(network, M):
             else:
                 traffic_matrix[node1][node2] = math.inf
     return traffic_matrix
+
+def plot_traffic_matrix(traffic_matrix, strategy, M):
+    matrix = pd.DataFrame.from_dict(traffic_matrix).to_numpy()
+    nodes = list(traffic_matrix.keys())
+    #print(matrix)
+    fig, ax = plt.subplots()
+    for r in range(0, matrix.shape[0]):
+        for c in range(0, matrix.shape[1]):
+            text = ax.text(c, r, matrix[r, c], ha='center', va= 'center', color='w')
+    xlabel = nodes
+    ylabel = nodes
+    x = np.r_[:len(xlabel)]
+    y = np.r_[:len(ylabel)]
+    plt.title('Traffic matrix with '+str(strategy)+' rate and M= '+str(M))
+    plt.xticks(x, xlabel)
+    plt.yticks(y, ylabel)
+    cmap = plt.cm.jet
+    cmap = copy.copy(plt.cm.get_cmap("jet"))
+    cmap.set_bad('orange', 1.)
+    ax.imshow(matrix, interpolation='nearest',cmap=cmap)

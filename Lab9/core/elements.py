@@ -411,7 +411,7 @@ class Network(object):
                 connection.snr = 0.0
                 connection.latency = 0.0
                 connection.bit_rate = 0
-        self.restore_network()
+        #self.restore_network()
         #print(self.switching_matrix)
         #exit()
     def find_channel(self, path):
@@ -484,10 +484,9 @@ class Network(object):
         current_connections = [connection]
         self.stream(current_connections, 'snr')
         connections.append(connection)
-        print("traffic:", traffic_matrix[input_node][output_node])
         if connection.snr != 0:
             if connection.bit_rate >= traffic_matrix[input_node][output_node]:
-                traffic_matrix[input_node][output_node] = 0
+                traffic_matrix[input_node][output_node] = math.inf
                 return 1
             else:
                 traffic_matrix[input_node][output_node] -= connection.bit_rate

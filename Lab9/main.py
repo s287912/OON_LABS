@@ -10,19 +10,24 @@ from core import elements as elem
 #from core import elements_git as elem2
 
 if __name__ == '__main__':
-    net = elem.Network('resources/nodes_full_fixed_rate.json')
+    net = elem.Network('resources/nodes_small.json')
+    #net = elem.Network('resources/nodes_small.json')
     net2 = elem.Network('resources/nodes_full_flex_rate.json')
     net3 = elem.Network('resources/nodes_full_shannon.json')
 
-M= 1
+M= 32
 traffic_matrix = util.init_traffic_matrix(net, M)
 n_nodes = len(net.nodes)
 connections = []
 conn_made = n_nodes * n_nodes - n_nodes
 while conn_made > 0:
     conn_made -= net.traffic_matrix_request(traffic_matrix, connections, 1e-3)
+    print(pd.DataFrame.from_dict(traffic_matrix).to_numpy())
     #print(traffic_matrix)
 
+util.plot_traffic_matrix(traffic_matrix, 'fixed_rate', M)
+plt.show()
+exit()
 util.plot_snr_and_bit_rate('fixed_rate', connections)
 
 exit()
