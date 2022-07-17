@@ -62,7 +62,6 @@ class Lightpath(SignalInformation):
     def df(self):
         return self._df
 
-
 class Node(object):
     def __init__(self, node_dict):
         self._label = node_dict['label']
@@ -248,7 +247,8 @@ class Network(object):
                 line_dict['length'] = np.sqrt(np.sum((node_position-connected_node_position)**2))
                 line = Line(line_dict)
                 self._lines[line_label] = line
-            self._switching_matrix[node_label] = node_dict['switching_matrix']
+            if 'switching_matrix' in node_dict.keys():
+                self._switching_matrix[node_label] = node_dict['switching_matrix']
             #print("switching_matrix", self._switching_matrix_dict)
             #exit()
         #create the weight
@@ -301,22 +301,22 @@ class Network(object):
     @switching_matrix.setter
     def switching_matrix(self, switching_matrix):
         self._switching_matrix = switching_matrix
-    #@property
-    #def draw(self):
-    #    nodes = self.nodes
-    #    for node_label in nodes:
-    #        n0 = nodes[node_label]
-    #        x0 = n0.position[0]
-    #        y0 = n0.position[1]
-    #        plt.plot(x0,y0,'go',markersize=10)
-    #        plt.text(x0+20,y0+20,node_label)
-    #        for connected_node_label in n0.connected_nodes:
-    #            n1 = nodes[connected_node_label]
-    #            x1 = n1.position[0]
-    #            y1 = n1.position[1]
-    #            plt.plot([x0,x1], [y0,y1], 'b')
-    #    plt.title('Network')
-        #plt.show()
+    @property
+    def draw(self):
+        nodes = self.nodes
+        for node_label in nodes:
+            n0 = nodes[node_label]
+            x0 = n0.position[0]
+            y0 = n0.position[1]
+            plt.plot(x0,y0, 'go', markersize=10)
+            plt.text(x0+20, y0+20, node_label)
+            for connected_node_label in n0.connected_nodes:
+                n1 = nodes[connected_node_label]
+                x1 = n1.position[0]
+                y1 = n1.position[1]
+                plt.plot([x0,x1], [y0,y1], 'b')
+        plt.title('Network')
+        plt.show()
     def find_paths(self, label1, label2):
         cross_nodes = [key for key in self.nodes.keys() if ((key != label1) & (key != label2))]
         cross_lines = self.lines.keys()
@@ -336,7 +336,8 @@ class Network(object):
         lines_dict = self.lines
         for node_label in nodes_dict:
             node = nodes_dict[node_label]
-            node.switching_matrix = copy.deepcopy(self.switching_matrix[node_label])
+            if 'switching_matrix' in nodes_dict.keys():
+                node.switching_matrix = copy.deepcopy(self.switching_matrix[node_label])
             for connected_node in node.connected_nodes:
                 line_label = node_label + connected_node
                 line = lines_dict[line_label]

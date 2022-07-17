@@ -200,7 +200,7 @@ class Line(object):
         noise = self.noise_generation(signal_power)
         signal_information.add_noise(noise)
         node = self.successive[signal_information.path[0]]
-        lightpath = node.propagate(signal_information)
+        signal_information = node.propagate(signal_information)
         return signal_information
     def ase_generation(self):
         self.n_amplifier = (math.ceil(self.length / 80e3) - 1) + 2
@@ -228,6 +228,7 @@ class Network(object):
         self._weighted_paths = pd.DataFrame()
         self._route_space = pd.DataFrame()
         self._switching_matrix = {}
+        self._blocking_count = 0
         for node_label in node_json:
             # create node instance
             node_dict = node_json[node_label]
@@ -301,6 +302,12 @@ class Network(object):
     @switching_matrix.setter
     def switching_matrix(self, switching_matrix):
         self._switching_matrix = switching_matrix
+    @property
+    def blocking_count(self):
+        return self._blocking_count
+    @blocking_count.setter
+    def blocking_count(self, blocking_count):
+        self._blocking_count = blocking_count
     #@property
     #def draw(self):
     #    nodes = self.nodes
@@ -480,6 +487,7 @@ class Network(object):
             output_node = pair[1]
             if traffic_matrix[input_node][output_node] != 0 and traffic_matrix[input_node][output_node] != math.inf:
                 break
+        # if is necessary has if matrix emptied need to skip the stream
         if self.traffic_matrix_free(traffic_matrix):
             #print(input_node, output_node)
             connection = Connection(input_node, output_node, signal_power)
@@ -494,7 +502,7 @@ class Network(object):
                     traffic_matrix[input_node][output_node] -= connection.bit_rate
                     return 0
             else:
-                #print("blocking")
+                self.blocking_count += 1
                 traffic_matrix[input_node][output_node] = math.inf
             return 1
         else:

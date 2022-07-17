@@ -10,9 +10,20 @@ from core import elements as elem
 #from core import elements_git as elem2
 import math
 if __name__ == '__main__':
+    N_MC = 1
     M = 8
     net = elem.Network('resources/nodes_full_fixed_rate.json')
     print(net.weighted_paths)
+    capacity = pd.DataFrame()
+    capacity['Capacity'] = []
+    capacity['Rb_avg'] = []
+    capacity['Rb_max'] = []
+    capacity['Rb_min'] = []
+    snr = pd.DataFrame()
+    snr['snr_avg'] = []
+    snr['snr_max'] = []
+    snr['snr_min'] = []
+    snr['blocking_count'] = []
     #net = elem.Network('resources/nodes_small.json')
     #net2 = elem.Network('resources/nodes_full_flex_rate.json')
     #net3 = elem.Network('resources/nodes_full_shannon.json')
@@ -21,20 +32,34 @@ for node1 in net.nodes.keys():
     for node2 in net.nodes.keys():
         if node1 != node2:
             pairs.append(str(node1+node2))
-
-traffic_matrix = util.init_traffic_matrix(net, M)
 n_nodes = len(net.nodes)
-connections = []
-conn_made = n_nodes * n_nodes #- n_nodes
-while conn_made > 0:
-    conn_made -= net.traffic_matrix_request(traffic_matrix, connections, 1e-3, pairs)
-    #print(pd.DataFrame.from_dict(traffic_matrix).to_numpy())
-    #print(traffic_matrix)
 
 
+for i in range(0, N_MC):
+    connections = []
+    net.restore_network()
+    conn_made = n_nodes * n_nodes - n_nodes
+    traffic_matrix = util.init_traffic_matrix(net, M)
+    #print(net.route_space)
+    while conn_made > 0:
+        conn_made -= net.traffic_matrix_request(traffic_matrix, connections, 1e-3, pairs)
+        #print(pd.DataFrame.from_dict(traffic_matrix).to_numpy())
+        #print(traffic_matrix)
+
+    capacity.loc[len(capacity.index)] = util.capacity_metrics(connections)
+    snr.loc[len(snr)] = util.snr_metrics(connections)
+    print(i/N_MC*100, "% calculation")
+
+    #print(net.route_space)
+
+print(snr)
+print(capacity)
+print("blocking event: ", net.blocking_count)
+exit()
 util.plot_traffic_matrix(traffic_matrix, 'fixed_rate', M)
 util.wavelenght_occupation(net, M, 'fixed_rate')
 plt.show()
+print("stop")
 exit()
 util.plot_snr_and_bit_rate('fixed_rate', connections)
 

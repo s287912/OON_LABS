@@ -111,3 +111,31 @@ def wavelenght_occupation(network, M, strategy):
     plt.title('Wavelength congestion ' + strategy + ' rate with M = ' + str(M))
     plt.xticks(list(network.lines.keys()))
     plt.grid(True, linewidth=0.5, linestyle='--')
+
+def capacity_metrics(connections):
+    capacity = np.sum(connections[i].bit_rate for i in range(0, len(connections)))
+    bit_rates = np.array(list(connections[i].bit_rate for i in range(0, len(connections))))
+    #print([[connections[i].input, connections[i].output] for i in range(0, len(connections))])
+    blocking_event = np.count_nonzero(bit_rates == 0)
+    #print(blocking_event)
+    Rb_avg = capacity / len(connections)
+    Rb_max = max(bit_rates)
+    Rb_min = min(bit_rates)
+#    print("Total capacity: ", capacity/1e9, "Gbps")
+ #   print("Average Rb: ", Rb_avg/1e9, "Gbps")
+#    exit()
+    return [capacity/1e9, Rb_avg/1e9, Rb_max/1e9, Rb_min/1e9]
+def snr_metrics(connections):
+    total_snrs = np.sum(connections[i].snr for i in range(0, len(connections)))
+    snrs = np.array(list(connections[i].snr for i in range(0, len(connections))))
+    #print([[connections[i].input, connections[i].output] for i in range(0, len(connections))])
+    blocking_event = np.count_nonzero(snrs == 0)
+    #print(blocking_event)
+    snr_avg = total_snrs / (len(connections) - blocking_event)
+    snr_max = max(snrs[snrs != 0])
+    snr_min = min(snrs[snrs != 0])
+#    print("Total capacity: ", capacity/1e9, "Gbps")
+ #   print("Average Rb: ", Rb_avg/1e9, "Gbps")
+#    exit()
+ #   print(blocking_event)
+    return [snr_avg, snr_max, snr_min, blocking_event]
