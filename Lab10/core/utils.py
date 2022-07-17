@@ -22,16 +22,6 @@ def truncate(number, decimals=0):
     return math.trunc(number * factor) / factor
 
 
-# Function that adds "->" characters between the letters
-def path_add_arrows(path):
-    return path.replace("", "->")[2:-2]
-
-
-# Get two random nodes from the node list
-def sample_2_nodes(network_nodes_list):
-    return random.sample(network_nodes_list, 2)
-
-
 # Method to update a route_space
 def update_route_space(route_space, nodes, lines):
     for path in route_space.index.tolist():
@@ -91,7 +81,7 @@ def plot_traffic_matrix(traffic_matrix, strategy, M):
     fig, ax = plt.subplots()
     for r in range(0, matrix.shape[0]):
         for c in range(0, matrix.shape[1]):
-            text = ax.text(c, r, matrix[r, c], ha='center', va= 'center', color='w')
+            text = ax.text(c, r, matrix[r, c]/1e9, ha='center', va= 'center', color='w')
     xlabel = nodes
     ylabel = nodes
     x = np.r_[:len(xlabel)]
@@ -104,4 +94,20 @@ def plot_traffic_matrix(traffic_matrix, strategy, M):
     cmap.set_bad('orange', 1.)
     ax.imshow(matrix, interpolation='nearest',cmap=cmap)
 
-
+def wavelenght_occupation(network, M, strategy):
+    occupancy = []
+    for line_label in network.lines.keys():
+        nwave = 0
+        state = network.lines[line_label].state
+        for ch in state:
+            nwave += ch
+        occupancy.append((1- (nwave / len(state))) * 100)
+        #print(line_label + " " +  str(nwave))
+        #print(line_label + " " + str((1- (nwave / len(state))) * 100))
+    plt.figure()
+    plt.scatter(list(network.lines.keys()), occupancy, label='Wavelength congestion')
+    plt.xlabel('Lines')
+    plt.ylabel('Congestion % ')
+    plt.title('Wavelength congestion ' + strategy + ' rate with M = ' + str(M))
+    plt.xticks(list(network.lines.keys()))
+    plt.grid(True, linewidth=0.5, linestyle='--')

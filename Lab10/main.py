@@ -10,23 +10,30 @@ from core import elements as elem
 #from core import elements_git as elem2
 import math
 if __name__ == '__main__':
-    M = 1
+    M = 8
     net = elem.Network('resources/nodes_full_fixed_rate.json')
     print(net.weighted_paths)
     #net = elem.Network('resources/nodes_small.json')
     #net2 = elem.Network('resources/nodes_full_flex_rate.json')
     #net3 = elem.Network('resources/nodes_full_shannon.json')
+pairs = []
+for node1 in net.nodes.keys():
+    for node2 in net.nodes.keys():
+        if node1 != node2:
+            pairs.append(str(node1+node2))
 
 traffic_matrix = util.init_traffic_matrix(net, M)
 n_nodes = len(net.nodes)
 connections = []
 conn_made = n_nodes * n_nodes #- n_nodes
 while conn_made > 0:
-    conn_made -= net.traffic_matrix_request(traffic_matrix, connections, 1e-3)
+    conn_made -= net.traffic_matrix_request(traffic_matrix, connections, 1e-3, pairs)
     #print(pd.DataFrame.from_dict(traffic_matrix).to_numpy())
     #print(traffic_matrix)
 
+
 util.plot_traffic_matrix(traffic_matrix, 'fixed_rate', M)
+util.wavelenght_occupation(net, M, 'fixed_rate')
 plt.show()
 exit()
 util.plot_snr_and_bit_rate('fixed_rate', connections)

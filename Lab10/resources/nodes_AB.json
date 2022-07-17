@@ -1,0 +1,40 @@
+{
+ "A": {
+  "connected_nodes": [
+   "B"
+  ],
+  "transceiver": "fixed_rate",
+  "switching_matrix": {
+   "B": {
+    "B": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  "position": [
+   -350e3,
+   150e3
+  ]
+ },
+ "B": {
+  "connected_nodes": [
+   "A"
+  ],
+  "transceiver": "fixed_rate",
+  "switching_matrix": {
+   "A": {
+    "A": [
+     0,
+     0,
+     0
+    ]
+   }
+  },
+  "position": [
+   -100e3,
+   400e3
+  ]
+ }
+}

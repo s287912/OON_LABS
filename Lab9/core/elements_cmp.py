@@ -8,6 +8,7 @@ from scipy.constants import c
 from core import parameters as param
 from core import science_utils as science
 import random as rand
+from scipy.special import erfcinv as erfcinv
 
 class SignalInformation(object):
     def __init__(self, power, path):
@@ -221,210 +222,196 @@ class Line(object):
 
 class Network(object):
     def __init__(self, json_path):
-        node_json = json.load(open(json_path,'r'))
+        node_json = json.load(open(json_path, 'r'))
         self._nodes = {}
         self._lines = {}
-        self._weighted_paths = pd.DataFrame()
-        self._route_space = pd.DataFrame()
+        self._weighted_path = pd.DataFrame()
         self._switching_matrix = {}
+        columns_name = ["path", "channels"]
+        self._route_space = pd.DataFrame(columns=columns_name)
+
         for node_label in node_json:
-            # create node instance
+            # Create the node instance
             node_dict = node_json[node_label]
             node_dict['label'] = node_label
             node = Node(node_dict)
             if 'transceiver' in node_json[node_label].keys():
                 node.transceiver = node_json[node_label]['transceiver']
             else:
-                node.transceiver = 'fixed_rate'
+                node.transceiver = 'fixed-rate'
             self._nodes[node_label] = node
-            #create line instances
+            # Create the line instances
             for connected_node_label in node_dict['connected_nodes']:
                 line_dict = {}
                 line_label = node_label + connected_node_label
                 line_dict['label'] = line_label
                 node_position = np.array(node_json[node_label]['position'])
                 connected_node_position = np.array(node_json[connected_node_label]['position'])
-                line_dict['length'] = np.sqrt(np.sum((node_position-connected_node_position)**2))
+                line_dict['length'] = np.sqrt(
+                    np.sum((node_position - connected_node_position) ** 2)
+                )
                 line = Line(line_dict)
                 self._lines[line_label] = line
-            self._switching_matrix[node_label] = node_dict['switching_matrix']
-            #print("switching_matrix", self._switching_matrix_dict)
-            #exit()
-        #create the weight
-        self.connect()
-        node_labels = self.nodes.keys()
-        pairs = []
-        for label1 in node_labels:
-            for label2 in node_labels:
-                if label1 != label2:
-                    pairs.append(label1+label2)
-        paths = []
-        latencies = []
-        noises = []
-        snrs = []
-        path_state = []
-        for pair in pairs:
-            for path in self.find_paths(pair[0], pair[1]):
-                path_string = ''
-                for node in path:
-                    path_string += node + '->'
-                paths.append(path_string[:-2])
 
-                signal_information = SignalInformation(1e-3, path)
-                signal_information = self.probe(signal_information)
-                latencies.append(signal_information.latency)
-                noises.append(signal_information.noise_power)
-                snrs.append(10 * np.log10(signal_information.signal_power / signal_information.noise_power))
-                path_state.append(1)
-        self._weighted_paths['path'] = paths
-        self._weighted_paths['latency'] = latencies
-        self._weighted_paths['noises'] = noises
-        self._weighted_paths['snr'] = snrs
-        for nch in range(0, param.channels):
-            self._route_space['Ch.'+str(nch)] = path_state
-    @property
-    def weighted_paths(self):
-        return self._weighted_paths
+            self._switching_matrix[node_label] = node_dict['switching_matrix']
+
     @property
     def nodes(self):
         return self._nodes
+
     @property
     def lines(self):
         return self._lines
+
+    @property
+    def weighted_path(self):
+        return self._weighted_path
+
+    @weighted_path.setter
+    def weighted_path(self, weighted_path):
+        self._weighted_path = weighted_path
+
     @property
     def route_space(self):
         return self._route_space
+
+    @route_space.setter
+    def route_space(self, route_space):
+        self._route_space = route_space
+
     @property
     def switching_matrix(self):
         return self._switching_matrix
+
     @switching_matrix.setter
     def switching_matrix(self, switching_matrix):
         self._switching_matrix = switching_matrix
-    @property
+
     def draw(self):
         nodes = self.nodes
         for node_label in nodes:
             n0 = nodes[node_label]
             x0 = n0.position[0]
             y0 = n0.position[1]
-            plt.plot(x0,y0,'go',markersize=10)
-            plt.text(x0+20,y0+20,node_label)
+            plt.plot(x0, y0, 'go', markersize=10)
+            plt.text(x0 + 20, y0 + 20, node_label)
             for connected_node_label in n0.connected_nodes:
                 n1 = nodes[connected_node_label]
                 x1 = n1.position[0]
                 y1 = n1.position[1]
-                plt.plot([x0,x1], [y0,y1], 'b')
+                plt.plot([x0, x1], [y0, y1], 'b')
         plt.title('Network')
         plt.show()
+
     def find_paths(self, label1, label2):
-        cross_nodes = [key for key in self.nodes.keys() if ((key != label1) & (key != label2))]
+        cross_nodes = [key for key in self.nodes.keys()
+                       if ((key != label1) & (key != label2))]
         cross_lines = self.lines.keys()
         inner_paths = {'0': label1}
         for i in range(len(cross_nodes) + 1):
-            inner_paths[str(i+1)] = []
+            inner_paths[str(i + 1)] = []
             for inner_path in inner_paths[str(i)]:
-                inner_paths[str(i+1)] += [inner_path + cross_node for cross_node in cross_nodes if ((inner_path[-1]+cross_node in cross_lines) & (cross_node not in inner_path))]
-            paths = []
-        for i in range(len(cross_nodes)+1):
+                inner_paths[str(i + 1)] += [inner_path + cross_node for cross_node in cross_nodes
+                                            if ((inner_path[-1] + cross_node in cross_lines) & (
+                            cross_node not in inner_path))]
+        paths = []
+        for i in range(len(cross_nodes) + 1):
             for path in inner_paths[str(i)]:
                 if path[-1] + label2 in cross_lines:
                     paths.append(path + label2)
         return paths
+
     def connect(self):
         nodes_dict = self.nodes
         lines_dict = self.lines
+
         for node_label in nodes_dict:
             node = nodes_dict[node_label]
+            '''Assinging switching matrix by using deepcopy to avoid 
+            reflection of modification in the original switching matrix of Network class '''
             node.switching_matrix = copy.deepcopy(self.switching_matrix[node_label])
+
             for connected_node in node.connected_nodes:
                 line_label = node_label + connected_node
                 line = lines_dict[line_label]
                 line.successive[connected_node] = nodes_dict[connected_node]
                 node.successive[line_label] = lines_dict[line_label]
+
     def propagate(self, lightpath):
-        path = lightpath.path
-        start_node = self.nodes[path[0]]
+        start_node = self.nodes[lightpath.path[0]]
         propagated_signal_information = start_node.propagate(lightpath, None)
         return propagated_signal_information
-    def probe(self, signal_information):
-        path = signal_information.path
-        start_node = self.nodes[path[0]]
-        propagated_signal_information = start_node.propagate(signal_information,None)
-        return propagated_signal_information
-    def find_best_snr(self, input_label, output_label):
-        paths_df = self.weighted_paths
-        paths_df = paths_df.loc[(paths_df['path'].str[0] == input_label) & (paths_df['path'].str[-1] == output_label)]
-        paths_df = paths_df.sort_values(['snr'], inplace=False, ascending=False)
-        #print(paths_df)
-        #exit()
-        best_path = ''
-        for path in paths_df['path'].str.replace('->', ''):
-            channel = self.find_channel(path)
-            if channel != None:
-                #print(path,channel)
-                best_path = path
-                break
-        return best_path, channel
-    def find_best_latency(self, input_label, output_label):
-        paths_df = self.weighted_paths
-        paths_df = paths_df.loc[(paths_df['path'].str[0] == input_label) & (paths_df['path'].str[-1] == output_label)]
-        paths_df = paths_df.sort_values(['latency'], inplace=False, ascending=True)
-        #print(paths_df)
-        #exit()
-        best_path = ''
-        for path in paths_df['path'].str.replace('->', ''):
-            channel = self.find_channel(path)
-            if channel != None:
-                #print(path,channel)
-                best_path = path
-                break
-        return best_path, channel
-    def stream(self, connections, label = 'latency'):
+
+    def find_best_snr(self, node_input, node_output):
+        if node_input != node_output:
+            my_df = self.weighted_path
+            my_df.sort_values(by=['snr'], inplace=True, ascending=False)
+            my_df_filtered = my_df[(my_df['path'].str[0] == node_input) & (my_df['path'].str[-1] == node_output)]
+            for i in my_df_filtered.values:
+                path = i[0]  # path
+                channel = self.channel_free(path)
+                if channel is not None:
+                    # [best_path, latency, noise, snr], best_path, channel selected for the best path
+                    return i, i[0], channel
+        return None, None, None
+
+    ''' Method to find the index of the first channel free for the specified path'''
+    def channel_free(self, path):
+        path_in_route_space = self.route_space[self.route_space['path'] == path]
+        for i in range(param.channels):
+            if path_in_route_space['channels'].values[0][i] == 1:
+                return i
+        return None
+
+    def find_best_latency(self, node_input, node_output):
+        if node_input != node_output:
+            my_df = self.weighted_path
+            my_df.sort_values(by=['latency'], inplace=True, ascending=True)
+            my_df_filtered = my_df[(my_df['path'].str[0] == node_input) & (my_df['path'].str[-1] == node_output)]
+            for i in my_df_filtered.values:
+                path = i[0]
+                channel = self.channel_free(path)
+                if channel is not None:
+                    # [best_path, latency, noise, snr], best_path, channel selected for the best path
+                    return i, i[0], channel
+        return None, None, None
+
+    def stream(self, connections, label='latency'):
         for connection in connections:
-            best_path = ''
             if label == 'snr':
-                best_path, channel = self.find_best_snr(connection.input, connection.output)
+                best_path_array, best_path, channel = self.find_best_snr(connection.input, connection.output)
             else:
-                best_path, channel = self.find_best_latency(connection.input, connection.output)
-            if (best_path != '') & (channel != None):
-                lightpath = Lightpath(connection.signal_power, best_path, channel)
-                bit_rate = self.calculate_bit_rate(lightpath, self.nodes[best_path[0]].transceiver)
+                best_path_array, best_path, channel = self.find_best_latency(connection.input, connection.output)
+
+            if best_path is not None:
+                # path string without "->"
+                path_label = ''
+                for index in range(0, len(best_path), 3):
+                    path_label += best_path[index]
+
+                lightpath = Lightpath(connection.signal_power, path_label, channel)
+                bit_rate = self.calculate_bit_rate(lightpath, self.nodes[path_label[0]].transceiver)
                 if bit_rate == 0:
                     connection.snr = 0
-                    connection.latency = 0
+                    connection.latency = -1  # None
                     connection.bit_rate = 0
                 else:
                     self.propagate(lightpath)
-                    self.update_route_space()
+                    connection.snr = self.snr_dB(lightpath)
+                    connection.latency = lightpath.latency
                     connection.bit_rate = bit_rate
-                    #print("connect:",connection.input,"->",connection.output, "of path:",best_path,"using channel:", channel)
-                    if label == 'snr':
-                        connection.snr = 10 * np.log10(lightpath.signal_power / lightpath.noise_power)
-                    else:
-                        connection.latency = lightpath.latency
+                    # Updating routing space after lightpath propagation
+                    self.update_routing_space(best_path)  # 0= route space not empty
             else:
-                #df = self.route_space
-                #df = df.loc[(self.weighted_paths['path'] == best_path.replace('', '->')[2:-2])]
-                #print("Not possible to connect:",connection.input,"->",connection.output)
-                #print("Occupation of", best_path)
-                #print(df)
-                connection.snr = 0.0
-                connection.latency = 0.0
-                connection.bit_rate = 0
-        #self.restore_network()
-        #print(self.switching_matrix)
-        #exit()
-    def find_channel(self, path):
-        channel = None
-        for ch in range(0, param.channels):
-            df = self.route_space
-            df = df.loc[(self.weighted_paths['path'] == path.replace('','->')[2:-2])]
-            if df['Ch.'+str(ch)].values == 1:
-                channel = ch
-                break
-        return channel
-    def update_route_space(self):
-        df = self.weighted_paths['path'].str.replace('->','')
+                ''' if there is no best path for snr and latency'''
+                connection.snr = 0
+                connection.latency = -1  # None
+
+    def snr_dB(self, lightpath):
+        return (10 * np.log10(lightpath.signal_power / lightpath.noise_power))
+
+    def update_routing_space(self, best_path):
+        df = self.weighted_path['path'].str.replace('->','')
         #print(df)
         for path in df:
             #print(path)
@@ -437,77 +424,79 @@ class Network(object):
                 occupancy = np.multiply(self.nodes[path[node1]].switching_matrix[path[node1-1]][path[node2]], occupancy)
                 node1 = node2
             #print(occupancy)
-            idx = self.weighted_paths.loc[df == path].index.values[0]
+            idx = self.weighted_path.loc[df == path].index.values[0]
             self.route_space.iloc[idx] = occupancy
         return None
+
     def restore_network(self):
-        path_state = [1]*self.weighted_paths.shape[0]
-        #print(path_state)
-        for nch in range(0, param.channels):
-            self._route_space['Ch.'+str(nch)] = path_state
+        self.route_space = self.route_space[0:0]
         nodes_dict = self.nodes
         lines_dict = self.lines
         for node_label in nodes_dict:
-            nodes_dict[node_label].switching_matrix = copy.deepcopy(self.switching_matrix[node_label])
-        for line_label in lines_dict:
-            lines_dict[line_label].state = np.ones(param.channels, np.int8)
+            node = nodes_dict[node_label]
+            node.switching_matrix = copy.deepcopy(self.switching_matrix[node_label])
 
-        self.update_route_space()
+        for line_label in lines_dict:
+            line = lines_dict[line_label]
+            # print(line.state)
+            line.state = np.ones(param.channels, np.int8)  # channel free
+
+        self.update_routing_space(None)
 
     def calculate_bit_rate(self, lightpath, strategy):
-        path = lightpath.path
-        bit_rate = 0
-        gsnr = self.weighted_paths[self.weighted_paths['path'] == path.replace('', '->')[2:-2]]['snr'].values[0]
-        #print(gsnr)
-        gsnr = float(10 ** (gsnr / 10))
-
+        path_label = ''
+        for node in lightpath.path:
+            path_label += node + '->'
+        gsnr_dB = self.weighted_path[self.weighted_path['path'] == path_label[:-2]]['snr'].values[0]  # dB
+        gsnr = 10 ** (gsnr_dB / 10)
+        #print("GSNR linear: ", gsnr, " GSNR dB: ", gsnr_dB)
         if strategy == 'fixed_rate':
-            bit_rate = science.bit_rate_fixed(gsnr, lightpath.Rs)
-        elif strategy == 'flex_rate':
-            bit_rate = science.bit_rate_flex(gsnr, lightpath.Rs)
-        elif strategy == 'shannon':
-            bit_rate = science.bit_rate_shannon(gsnr, lightpath.Rs)
-
-        #print(gsnr, bit_rate)
-        return bit_rate
-    def traffic_matrix_request(self, traffic_matrix, connections, signal_power):
-        nodes_full = list(self.nodes.keys())
-        while self.traffic_matrix_free(traffic_matrix):
-            nodes = copy.deepcopy(nodes_full)
-            input_node = rand.choice(nodes)
-            nodes.remove(input_node)
-            output_node = rand.choice(nodes)
-            #print("input:", input_node, "output:", output_node)
-            if traffic_matrix[input_node][output_node] != 0 and traffic_matrix[input_node][output_node] != math.inf:
-                break
-        if self.traffic_matrix_free(traffic_matrix):
-            #print(input_node, output_node)
-            connection = Connection(input_node, output_node, signal_power)
-            current_connections = [connection]
-            self.stream(current_connections, 'snr')
-            connections.append(connection)
-            if connection.snr != 0:
-                if connection.bit_rate >= traffic_matrix[input_node][output_node]:
-                    traffic_matrix[input_node][output_node] = math.inf
-                    return 1
-                else:
-                    traffic_matrix[input_node][output_node] -= connection.bit_rate
-                    return 0
+            if gsnr >= 2 * ((erfcinv(2 * param.BERt)) ** 2) * lightpath.Rs / param.Bn:
+                return 100e9
             else:
-                traffic_matrix[input_node][output_node] = math.inf
-            return 1
-        else:
-            return 1
-    def traffic_matrix_free(self, traffic_matrix):
-        matrix = pd.DataFrame.from_dict(traffic_matrix).to_numpy()
-        matrix[matrix == math.inf] = 0
-        #print(matrix)
-        #print(traffic_matrix)
-        if np.any(matrix):
-            return True
-        else:
-            return False
+                return 0
+        elif strategy == 'flex_rate':
+            if gsnr < 2 * ((erfcinv(2 * param.BERt)) ** 2) * lightpath.Rs / param.Bn:
+                return 0
+            elif gsnr < 14 / 3 * ((erfcinv(3 / 2 * param.BERt)) ** 2) * lightpath.Rs / param.Bn:
+                return 100e9
+            elif gsnr < 10 * ((erfcinv(8 / 3 * param.BERt)) ** 2) * lightpath.Rs / param.Bn:
+                return 200e9
+            else:
+                return 400e9
+        elif strategy == 'shannon':
+            return 2 * lightpath.Rs * np.log2(1 + (gsnr * param.Bn / lightpath.Rs))
 
+    def request_generation_traffic_matrix(self, traffic_matrix, connections, signal_power):
+        nodes = list(self.nodes.keys())
+        while True:
+            input_rand = rand.choice(nodes)
+            output_rand = rand.choice(nodes)
+            ''' Generating connections only for input_node != output_node and
+             if the element corresponding to input, output node in the traffic matrix has still available traffic to allocate'''
+            if input_rand != output_rand and traffic_matrix[input_rand][output_rand] != 0 and \
+                    traffic_matrix[input_rand][output_rand] != math.inf:
+                break
+        connection = Connection(input_rand, output_rand, signal_power)
+        current_connections = [connection]
+        self.stream(current_connections, 'snr')
+        connections.append(connection)
+
+        # Updating traffic matrix if a best path is found in the stream() method
+        if connection.snr != 0:
+            # Bit rate request for the connection is completely satisfied
+            if connection.bit_rate >= traffic_matrix[input_rand][output_rand]:
+                traffic_matrix[input_rand][output_rand] = 0
+                return 1  # decrement, capacity guaranteed
+            else:
+                # Updating the remaining capability after having satisfied the capability for the current connection
+                traffic_matrix[input_rand][output_rand] -= connection.bit_rate
+                return 0
+        else:
+            traffic_matrix[input_rand][output_rand] = math.inf
+        # If is not possible to define a suitable path for the connection,
+        # decrement the number of all possible connections by returning 1
+        return 1  # decrement
 class Connection(object):
     def __init__(self, input, output, signal_power):
         self._input = str(input)

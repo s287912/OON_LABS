@@ -188,9 +188,10 @@ class Line(object):
         node = self.successive[lightpath.path[0]]
 
         if type(lightpath) == Lightpath:
-            lightpath = node.propagate(lightpath,self.label[0])
+            self.state[lightpath.channel] = 0
+            lightpath = node.propagate(lightpath, self.label[0])
         else:
-            lightpath = node.propagate(lightpath,None)
+            lightpath = node.propagate(lightpath, None)
         return lightpath
     def probe(self, signal_information):
         latency = self.latency_generation()
@@ -300,22 +301,22 @@ class Network(object):
     @switching_matrix.setter
     def switching_matrix(self, switching_matrix):
         self._switching_matrix = switching_matrix
-    @property
-    def draw(self):
-        nodes = self.nodes
-        for node_label in nodes:
-            n0 = nodes[node_label]
-            x0 = n0.position[0]
-            y0 = n0.position[1]
-            plt.plot(x0,y0,'go',markersize=10)
-            plt.text(x0+20,y0+20,node_label)
-            for connected_node_label in n0.connected_nodes:
-                n1 = nodes[connected_node_label]
-                x1 = n1.position[0]
-                y1 = n1.position[1]
-                plt.plot([x0,x1], [y0,y1], 'b')
-        plt.title('Network')
-        plt.show()
+    #@property
+    #def draw(self):
+    #    nodes = self.nodes
+    #    for node_label in nodes:
+    #        n0 = nodes[node_label]
+    #        x0 = n0.position[0]
+    #        y0 = n0.position[1]
+    #        plt.plot(x0,y0,'go',markersize=10)
+    #        plt.text(x0+20,y0+20,node_label)
+    #        for connected_node_label in n0.connected_nodes:
+    #            n1 = nodes[connected_node_label]
+    #            x1 = n1.position[0]
+    #            y1 = n1.position[1]
+    #            plt.plot([x0,x1], [y0,y1], 'b')
+    #    plt.title('Network')
+        #plt.show()
     def find_paths(self, label1, label2):
         cross_nodes = [key for key in self.nodes.keys() if ((key != label1) & (key != label2))]
         cross_lines = self.lines.keys()
@@ -358,6 +359,7 @@ class Network(object):
         #print(paths_df)
         #exit()
         best_path = ''
+        channel = None
         for path in paths_df['path'].str.replace('->', ''):
             channel = self.find_channel(path)
             if channel != None:
@@ -470,14 +472,12 @@ class Network(object):
 
         #print(gsnr, bit_rate)
         return bit_rate
-    def traffic_matrix_request(self, traffic_matrix, connections, signal_power):
+    def traffic_matrix_request(self, traffic_matrix, connections, signal_power, pairs):
         nodes_full = list(self.nodes.keys())
         while self.traffic_matrix_free(traffic_matrix):
-            nodes = copy.deepcopy(nodes_full)
-            input_node = rand.choice(nodes)
-            nodes.remove(input_node)
-            output_node = rand.choice(nodes)
-            #print("input:", input_node, "output:", output_node)
+            pair = rand.choice(pairs)
+            input_node = pair[0]
+            output_node = pair[1]
             if traffic_matrix[input_node][output_node] != 0 and traffic_matrix[input_node][output_node] != math.inf:
                 break
         if self.traffic_matrix_free(traffic_matrix):
@@ -488,15 +488,17 @@ class Network(object):
             connections.append(connection)
             if connection.snr != 0:
                 if connection.bit_rate >= traffic_matrix[input_node][output_node]:
-                    traffic_matrix[input_node][output_node] = math.inf
+                    traffic_matrix[input_node][output_node] = 0
                     return 1
                 else:
                     traffic_matrix[input_node][output_node] -= connection.bit_rate
                     return 0
             else:
+                #print("blocking")
                 traffic_matrix[input_node][output_node] = math.inf
             return 1
         else:
+            #print("block")
             return 1
     def traffic_matrix_free(self, traffic_matrix):
         matrix = pd.DataFrame.from_dict(traffic_matrix).to_numpy()
