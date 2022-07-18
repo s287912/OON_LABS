@@ -308,22 +308,22 @@ class Network(object):
     @blocking_count.setter
     def blocking_count(self, blocking_count):
         self._blocking_count = blocking_count
-    #@property
-    #def draw(self):
-    #    nodes = self.nodes
-    #    for node_label in nodes:
-    #        n0 = nodes[node_label]
-    #        x0 = n0.position[0]
-    #        y0 = n0.position[1]
-    #        plt.plot(x0,y0,'go',markersize=10)
-    #        plt.text(x0+20,y0+20,node_label)
-    #        for connected_node_label in n0.connected_nodes:
-    #            n1 = nodes[connected_node_label]
-    #            x1 = n1.position[0]
-    #            y1 = n1.position[1]
-    #            plt.plot([x0,x1], [y0,y1], 'b')
-    #    plt.title('Network')
-        #plt.show()
+    @property
+    def draw(self):
+        nodes = self.nodes
+        for node_label in nodes:
+            n0 = nodes[node_label]
+            x0 = n0.position[0]
+            y0 = n0.position[1]
+            plt.plot(x0,y0,'go',markersize=10)
+            plt.text(x0+20,y0+20,node_label)
+            for connected_node_label in n0.connected_nodes:
+                n1 = nodes[connected_node_label]
+                x1 = n1.position[0]
+                y1 = n1.position[1]
+                plt.plot([x0,x1], [y0,y1], 'b')
+        plt.title('Network')
+        plt.show()
     def find_paths(self, label1, label2):
         cross_nodes = [key for key in self.nodes.keys() if ((key != label1) & (key != label2))]
         cross_lines = self.lines.keys()
@@ -460,8 +460,8 @@ class Network(object):
             nodes_dict[node_label].switching_matrix = copy.deepcopy(self.switching_matrix[node_label])
         for line_label in lines_dict:
             lines_dict[line_label].state = np.ones(param.channels, np.int8)
-
         self.update_route_space()
+        self.blocking_count = 0
 
     def calculate_bit_rate(self, lightpath, strategy):
         path = lightpath.path

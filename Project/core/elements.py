@@ -62,6 +62,7 @@ class Lightpath(SignalInformation):
     def df(self):
         return self._df
 
+
 class Node(object):
     def __init__(self, node_dict):
         self._label = node_dict['label']
@@ -199,7 +200,7 @@ class Line(object):
         noise = self.noise_generation(signal_power)
         signal_information.add_noise(noise)
         node = self.successive[signal_information.path[0]]
-        lightpath = node.propagate(signal_information)
+        signal_information = node.propagate(signal_information)
         return signal_information
     def ase_generation(self):
         self.n_amplifier = (math.ceil(self.length / 80e3) - 1) + 2
@@ -227,6 +228,7 @@ class Network(object):
         self._weighted_paths = pd.DataFrame()
         self._route_space = pd.DataFrame()
         self._switching_matrix = {}
+        self._blocking_count = 0
         for node_label in node_json:
             # create node instance
             node_dict = node_json[node_label]
@@ -247,8 +249,7 @@ class Network(object):
                 line_dict['length'] = np.sqrt(np.sum((node_position-connected_node_position)**2))
                 line = Line(line_dict)
                 self._lines[line_label] = line
-            if 'switching_matrix' in node_dict.keys():
-                self._switching_matrix[node_label] = node_dict['switching_matrix']
+            self._switching_matrix[node_label] = node_dict['switching_matrix']
             #print("switching_matrix", self._switching_matrix_dict)
             #exit()
         #create the weight
@@ -302,14 +303,20 @@ class Network(object):
     def switching_matrix(self, switching_matrix):
         self._switching_matrix = switching_matrix
     @property
+    def blocking_count(self):
+        return self._blocking_count
+    @blocking_count.setter
+    def blocking_count(self, blocking_count):
+        self._blocking_count = blocking_count
+    @property
     def draw(self):
         nodes = self.nodes
         for node_label in nodes:
             n0 = nodes[node_label]
             x0 = n0.position[0]
             y0 = n0.position[1]
-            plt.plot(x0,y0, 'go', markersize=10)
-            plt.text(x0+20, y0+20, node_label)
+            plt.plot(x0,y0,'go',markersize=10)
+            plt.text(x0+20,y0+20,node_label)
             for connected_node_label in n0.connected_nodes:
                 n1 = nodes[connected_node_label]
                 x1 = n1.position[0]
@@ -336,8 +343,7 @@ class Network(object):
         lines_dict = self.lines
         for node_label in nodes_dict:
             node = nodes_dict[node_label]
-            if 'switching_matrix' in nodes_dict.keys():
-                node.switching_matrix = copy.deepcopy(self.switching_matrix[node_label])
+            node.switching_matrix = copy.deepcopy(self.switching_matrix[node_label])
             for connected_node in node.connected_nodes:
                 line_label = node_label + connected_node
                 line = lines_dict[line_label]
@@ -454,8 +460,8 @@ class Network(object):
             nodes_dict[node_label].switching_matrix = copy.deepcopy(self.switching_matrix[node_label])
         for line_label in lines_dict:
             lines_dict[line_label].state = np.ones(param.channels, np.int8)
-
         self.update_route_space()
+        self.blocking_count = 0
 
     def calculate_bit_rate(self, lightpath, strategy):
         path = lightpath.path
@@ -481,6 +487,7 @@ class Network(object):
             output_node = pair[1]
             if traffic_matrix[input_node][output_node] != 0 and traffic_matrix[input_node][output_node] != math.inf:
                 break
+        # if is necessary has if matrix emptied need to skip the stream
         if self.traffic_matrix_free(traffic_matrix):
             #print(input_node, output_node)
             connection = Connection(input_node, output_node, signal_power)
@@ -495,7 +502,7 @@ class Network(object):
                     traffic_matrix[input_node][output_node] -= connection.bit_rate
                     return 0
             else:
-                #print("blocking")
+                self.blocking_count += 1
                 traffic_matrix[input_node][output_node] = math.inf
             return 1
         else:

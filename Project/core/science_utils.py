@@ -3,10 +3,6 @@ from core import parameters as param
 from scipy.special import erfcinv as erfcinv
 
 
-# function that returns the SNR
-def to_snr(signal_power, noise_power):
-    return 10 * np.log10(signal_power / noise_power)
-
 
 # function that returns the distance between two points
 def line_len(node_pos, second_node_pos):
