@@ -14,7 +14,7 @@ import timeit
 if __name__ == '__main__':
     start = time.time()
     N_MC = 1
-    M = 20
+    M = 1
     #net = elem.Network('resources/nodes_small.json')
     net_fixed = elem.Network('resources/nodes_full_fixed_rate.json')
     net_flex = elem.Network('resources/nodes_full_flex_rate.json')
@@ -102,10 +102,9 @@ if MC == True:
     print("N. of connections shannon rate : ", len(connections_shannon))
     print(util.plot_traffic_matrix(traffic_matrix_shannon,'shannon', M))
     plt.show()
-    exit()
-    df_fixed.to_csv('fixed_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
-    df_flex.to_csv('flex_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
-    df_shannon.to_csv('shannon_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
+    df_fixed.to_csv('results/fixed_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
+    df_flex.to_csv('results/flex_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
+    df_shannon.to_csv('results/shannon_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
 
 else:
     M_MAX = 20

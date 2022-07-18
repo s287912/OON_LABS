@@ -10,15 +10,17 @@ from core import elements as elem
 #from core import elements_git as elem2
 import math
 import time as time
-import timeit
+import pickle
+
 if __name__ == '__main__':
     start = time.time()
     N_MC = 1
-    M = 20
-    net = elem.Network('resources/nodes_small.json')
-    net_fixed = elem.Network('resources/nodes_full_fixed_rate.json')
-    net_flex = elem.Network('resources/nodes_full_flex_rate.json')
-    net_shannon = elem.Network('resources/nodes_full_shannon.json')
+    M = 1
+    #net1 = elem.Network('resources/full_network.json')
+    #net2 = elem.Network('resources/not_full_network.json')
+    net_fixed = elem.Network('resources/full_network_fixed.json')
+    net_flex = elem.Network('resources/full_network_flex.json')
+    net_shannon = elem.Network('resources/full_network_shannon.json')
     #print(net.weighted_paths)
     capacity = pd.DataFrame()
     capacity['Capacity'] = []
@@ -36,7 +38,10 @@ if __name__ == '__main__':
     snr_fixed = copy.deepcopy(snr)
     snr_flex = copy.deepcopy(snr)
     snr_shannon = copy.deepcopy(snr)
-
+print(net_fixed.weighted_paths)
+print(net_flex.weighted_paths)
+print(net_shannon.weighted_paths)
+#exit()
 pairs = []
 for node1 in net_fixed.nodes.keys():
     for node2 in net_fixed.nodes.keys():
@@ -44,9 +49,8 @@ for node1 in net_fixed.nodes.keys():
             pairs.append(str(node1+node2))
 n_nodes = len(net_fixed.nodes)
 
-
 #net_fixed.draw
-MC = False
+MC = True
 if MC == True:
     for i in range(0, N_MC):
         connections_fixed = []
@@ -98,12 +102,18 @@ if MC == True:
     print("N. of connections fixed rate : ", len(connections_fixed))
     print("N. of connections flex rate : ", len(connections_flex))
     print("N. of connections shannon rate : ", len(connections_shannon))
-    print(util.plot_traffic_matrix(traffic_matrix_shannon,'shannon', M))
-    plt.show()
-    exit()
-    df_fixed.to_csv('fixed_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
-    df_flex.to_csv('flex_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
-    df_shannon.to_csv('shannon_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
+    #util.plot_traffic_matrix(traffic_matrix_shannon,'shannon', M)
+    #plt.show()
+
+    df_fixed.to_csv('results_full/fixed_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
+    df_flex.to_csv('results_full/flex_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
+    df_shannon.to_csv('results_full/shannon_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
+    with open('results_full/net_fixed.pkl', 'wb') as outp:
+        pickle.dump(net_fixed, outp, pickle.HIGHEST_PROTOCOL)
+    with open('results_full/net_flex.pkl', 'wb') as outp:
+        pickle.dump(net_flex, outp, pickle.HIGHEST_PROTOCOL)
+    with open('results_full/net_shannon.pkl', 'wb') as outp:
+        pickle.dump(net_shannon, outp, pickle.HIGHEST_PROTOCOL)
 
 else:
     M_MAX = 20
@@ -161,6 +171,6 @@ else:
     print(util.plot_traffic_matrix(traffic_matrix_shannon, 'shannon', M))
     plt.show()
     exit()
-    df_fixed.to_csv('fixed_M_MAX_' + str(M) + '.csv', index=False)
-    df_flex.to_csv('flex_M_MAX_' + str(M) + '.csv', index=False)
-    df_shannon.to_csv('shannon_M_MAX_' + str(M) + '.csv', index=False)
+    df_fixed.to_csv('results_full/fixed_M_MAX_' + str(M) + '.csv', index=False)
+    df_flex.to_csv('results_full/flex_M_MAX_' + str(M) + '.csv', index=False)
+    df_shannon.to_csv('results_full/shannon_M_MAX_' + str(M) + '.csv', index=False)
