@@ -105,16 +105,16 @@ if MC == True:
     #util.plot_traffic_matrix(traffic_matrix_shannon,'shannon', M)
     #plt.show()
 
-    df_fixed.to_csv('results_full/fixed_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
-    df_flex.to_csv('results_full/flex_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
-    df_shannon.to_csv('results_full/shannon_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
-    with open('results_full/STMS_net_fixed.pkl', 'wb') as outp:
+    df_fixed.to_csv('results_full/fixed_M_'+str(M)+'_MC_'+str(N_MC)+'_2.csv', index=False)
+    df_flex.to_csv('results_full/flex_M_'+str(M)+'_MC_'+str(N_MC)+'_2.csv', index=False)
+    df_shannon.to_csv('results_full/shannon_M_'+str(M)+'_MC_'+str(N_MC)+'_2.csv', index=False)
+    with open('results_full/STMS_net_fixed_2.pkl', 'wb') as outp:
         pickle.dump(net_fixed, outp, pickle.HIGHEST_PROTOCOL)
         pickle.dump(traffic_matrix_fixed, outp, pickle.HIGHEST_PROTOCOL)
-    with open('results_full/STMS_net_flex.pkl', 'wb') as outp:
+    with open('results_full/STMS_net_flex_2.pkl', 'wb') as outp:
         pickle.dump(net_flex, outp, pickle.HIGHEST_PROTOCOL)
         pickle.dump(traffic_matrix_flex, outp, pickle.HIGHEST_PROTOCOL)
-    with open('results_full/STMS_net_shannon.pkl', 'wb') as outp:
+    with open('results_full/STMS_net_shannon_2.pkl', 'wb') as outp:
         pickle.dump(net_shannon, outp, pickle.HIGHEST_PROTOCOL)
         pickle.dump(traffic_matrix_shannon, outp, pickle.HIGHEST_PROTOCOL)
 

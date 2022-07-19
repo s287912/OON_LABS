@@ -12,7 +12,7 @@ import math
 import time as time
 import pickle
 
-with open('results_full/STMS_net_shannon.pkl', 'rb') as inp:
+with open('results_full/STMS_net_shannon_2.pkl', 'rb') as inp:
     net_shannon = pickle.load(inp)
     traffic_matrix_shannon = pickle.load(inp)
 
@@ -21,4 +21,4 @@ with open('results_full/STMS_net_shannon.pkl', 'rb') as inp:
 
 df = net_shannon.route_space
 print(df)
-print(df.loc[df['Ch.2'] == 1])
+print(df.loc[df['Ch.9'] == 1])
