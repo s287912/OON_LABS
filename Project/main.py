@@ -14,8 +14,8 @@ import pickle
 
 if __name__ == '__main__':
     start = time.time()
-    N_MC = 1
-    M = 1
+    N_MC = 5
+    M = 40
     #net1 = elem.Network('resources/full_network.json')
     #net2 = elem.Network('resources/not_full_network.json')
     net_fixed = elem.Network('resources/full_network_fixed.json')
@@ -108,12 +108,15 @@ if MC == True:
     df_fixed.to_csv('results_full/fixed_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
     df_flex.to_csv('results_full/flex_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
     df_shannon.to_csv('results_full/shannon_M_'+str(M)+'_MC_'+str(N_MC)+'.csv', index=False)
-    with open('results_full/net_fixed.pkl', 'wb') as outp:
+    with open('results_full/STMS_net_fixed.pkl', 'wb') as outp:
         pickle.dump(net_fixed, outp, pickle.HIGHEST_PROTOCOL)
-    with open('results_full/net_flex.pkl', 'wb') as outp:
+        pickle.dump(traffic_matrix_fixed, outp, pickle.HIGHEST_PROTOCOL)
+    with open('results_full/STMS_net_flex.pkl', 'wb') as outp:
         pickle.dump(net_flex, outp, pickle.HIGHEST_PROTOCOL)
-    with open('results_full/net_shannon.pkl', 'wb') as outp:
+        pickle.dump(traffic_matrix_flex, outp, pickle.HIGHEST_PROTOCOL)
+    with open('results_full/STMS_net_shannon.pkl', 'wb') as outp:
         pickle.dump(net_shannon, outp, pickle.HIGHEST_PROTOCOL)
+        pickle.dump(traffic_matrix_shannon, outp, pickle.HIGHEST_PROTOCOL)
 
 else:
     M_MAX = 20
