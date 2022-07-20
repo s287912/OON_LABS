@@ -311,19 +311,31 @@ class Network(object):
     @property
     def draw(self):
         nodes = self.nodes
+        plt.figure(figsize=(12, 8))
+        xlist = []
+        ylist = []
         for node_label in nodes:
             n0 = nodes[node_label]
             x0 = n0.position[0]
             y0 = n0.position[1]
-            plt.plot(x0,y0,'go',markersize=10)
-            plt.text(x0+20,y0+20,node_label)
+            xlist.append(x0)
+            ylist.append(y0)
+            plt.plot(x0,y0,'ro',markersize=10)
+            plt.text(x0,y0+20000,node_label)
             for connected_node_label in n0.connected_nodes:
                 n1 = nodes[connected_node_label]
                 x1 = n1.position[0]
                 y1 = n1.position[1]
-                plt.plot([x0,x1], [y0,y1], 'b')
-        plt.title('Network')
-        plt.show()
+                plt.plot([x0,x1], [y0,y1], 'b', linewidth=1)
+        plt.ticklabel_format(axis="x", style="sci", scilimits=(0,0))
+        plt.ticklabel_format(axis="y", style="sci", scilimits=(0,0))
+
+        plt.grid(color='k', linestyle='--', linewidth=0.5)
+        plt.xticks(np.linspace(min(xlist), max(xlist), 10))
+        plt.yticks(np.linspace(min(ylist), max(ylist), 10))
+        plt.title('Network 287912 - Simone Cascianelli')
+
+        #plt.show()
     def find_paths(self, label1, label2):
         cross_nodes = [key for key in self.nodes.keys() if ((key != label1) & (key != label2))]
         cross_lines = self.lines.keys()
